@@ -10,6 +10,8 @@ The default surface is local LAN/tailnet on port `8100`. This is a self-hosted t
   Tu visor no puede reproducir el video inline. [Abrir el MP4 directamente](demo/outputs/secret-vault-demo.mp4).
 </video>
 
+<a href="demo/outputs/secret-vault-demo.mp4"><img src="demo/outputs/secret-vault-demo.gif" alt="Preview animado del demo de Secret Vault" width="640"></a>
+
 [Abrir el MP4 directamente](demo/outputs/secret-vault-demo.mp4) · [Código del video](demo/README.md)
 
 El recorrido muestra el caso principal: guardar `GITHUB_TOKEN`, descubrir solo su nombre, llamar a `/api/use/GITHUB_TOKEN` y recibir una respuesta sin el valor plano.
