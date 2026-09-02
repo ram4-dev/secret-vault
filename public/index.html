@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Secret Vault</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <h1>🔐 Secret Vault</h1>
+    <p class="sub">Guardá secretos acá. Los agentes pueden <b>usarlos</b> (vía <code>/api/use</code>) pero <b>nunca leer los valores</b>.</p>
+
+    <section id="add">
+      <h2>Agregar un secreto</h2>
+      <form id="secret-form">
+        <label>Nombre <input id="s-name" placeholder="GH_TOKEN" required></label>
+        <label>Valor <input id="s-value" type="password" placeholder="••••••••" required></label>
+        <label>Descripción (opcional) <input id="s-desc" placeholder="para qué se usa"></label>
+        <button type="submit">Guardar</button>
+      </form>
+      <p id="msg"></p>
+    </section>
+
+    <section id="list">
+      <h2>Secretos guardados <span id="count"></span></h2>
+      <p class="hint">Los valores se muestran solo si ingresás la <b>master key</b> (los agentes que no la tengan solo ven nombres).</p>
+      <label>Master key (para revelar valores) <input id="master-key" type="password" placeholder="••••••••"></label>
+      <ul id="secrets"></ul>
+    </section>
+
+    <section id="use">
+      <h2>Tool opaca (probar sin leer)</h2>
+      <p class="hint">El agente invoca <code>/api/use/:name</code> — el servidor resuelve el secreto y ejecuta. El valor jamás aparece en la respuesta.</p>
+      <div class="usetest">
+        <input id="u-name" placeholder="nombre del secreto">
+        <button id="btn-echo">echo (disponible?)</button>
+      </div>
+      <pre id="u-out"></pre>
+    </section>
+  </main>
+  <script src="/app.js"></script>
+</body>
+</html>

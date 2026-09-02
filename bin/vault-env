@@ -1,0 +1,153 @@
+#!/usr/bin/env python3
+"""vault-env — materializa secretos del Secret Vault en un .env (o en el entorno de
+un proceso) SIN que los valores pasen por el contexto del agente.
+
+El agente solo arma el comando; los valores viajan vault → archivo directo.
+La salida del comando muestra solo nombres y conteos, nunca valores.
+
+Uso:
+  vault-env to <archivo.env> [--names A,B | --prefix P | --all] [--append]
+  vault-env run [--names A,B | --prefix P | --all] -- <comando...>
+  vault-env list
+
+Opciones:
+  --append    agrega al archivo en vez de sobrescribir (hace merge por clave)
+  --all       todos los secretos (por defecto hay que especificar --names o --prefix)
+  VAULT_URL   override de la URL del vault (default: http://127.0.0.1:8100)
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import urllib.error
+import urllib.request
+
+VAULT = os.environ.get("VAULT_URL", "http://127.0.0.1:8100").rstrip("/")
+PLAIN = re.compile(r"^[A-Za-z0-9_@%+=:,./~-]+$")
+
+
+def die(msg, code=1):
+    print(f"vault-env: {msg}", file=sys.stderr)
+    sys.exit(code)
+
+
+def fetch(names=None, prefix=None):
+    q = []
+    if names:
+        q.append("names=" + ",".join(names))
+    if prefix:
+        q.append("prefix=" + prefix)
+    url = f"{VAULT}/api/env.json" + (("?" + "&".join(q)) if q else "")
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return json.load(r)
+    except urllib.error.HTTPError as e:
+        body = e.read().decode(errors="replace")
+        die(f"vault respondió {e.code}: {body[:200]}")
+    except urllib.error.URLError as e:
+        die(f"no pude conectarme al vault ({VAULT}): {e.reason}")
+
+
+def parse_env_file(path):
+    out = {}
+    if not os.path.exists(path):
+        return out
+    for line in open(path, encoding="utf-8"):
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        v = v.strip()
+        if len(v) >= 2 and v[0] == v[-1] and v[0] in "'\"":
+            v = v[1:-1]
+        out[k.strip()] = v
+    return out
+
+
+def dotenv_line(k, v):
+    v = str(v)
+    if "\n" in v or "\r" in v:
+        die(f"el secreto '{k}' tiene saltos de línea: no se puede serializar a .env plano")
+    return f"{k}={v}" if PLAIN.match(v) else f"{k}='{v}'"
+
+
+def parse_args(argv):
+    names, prefix, append, path, cmd = None, None, False, None, None
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == "--names":
+            i += 1
+            names = [s.strip() for s in argv[i].split(",") if s.strip()]
+        elif a == "--prefix":
+            i += 1
+            prefix = argv[i]
+        elif a == "--all":
+            names, prefix = None, None
+            all_flag = True
+        elif a == "--append":
+            append = True
+        elif a == "--":
+            cmd = argv[i + 1:]
+            break
+        elif path is None and cmd is None:
+            path = a
+        else:
+            die(f"argumento inesperado: {a}")
+        i += 1
+    explicit = bool(names or prefix or locals().get("all_flag"))
+    return names, prefix, append, path, cmd, explicit
+
+
+def main():
+    argv = sys.argv[1:]
+    if not argv or argv[0] in ("-h", "--help", "help"):
+        print(__doc__)
+        return
+    mode = argv.pop(0)
+
+    if mode == "list":
+        try:
+            with urllib.request.urlopen(f"{VAULT}/api/secrets", timeout=10) as r:
+                data = json.load(r)
+        except (urllib.error.HTTPError, urllib.error.URLError) as e:
+            die(f"no pude listar el vault: {e}")
+        secrets = data.get("secrets", [])
+        for s in secrets:
+            print(s.get("name") if isinstance(s, dict) else s)
+        return
+
+    names, prefix, append, path, cmd, explicit = parse_args(argv)
+
+    if not explicit:
+        die("indicá --names A,B o --prefix P o --all (no hay volcado accidental)")
+    if mode == "to":
+        if not path:
+            die("falta la ruta del .env destino")
+        secrets = fetch(names, prefix)
+        merged = parse_env_file(path) if append else {}
+        merged.update(secrets)
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            f.write("\n".join(dotenv_line(k, v) for k, v in merged.items()) + "\n")
+        os.chmod(tmp, 0o600)
+        os.replace(tmp, path)
+        os.chmod(path, 0o600)
+        print(f"✓ {len(secrets)} secretos → {path} ({len(merged)} claves totales, permisos 600)")
+        print("  claves: " + ", ".join(sorted(secrets)))
+    elif mode == "run":
+        if not cmd:
+            die("falta el comando después de --")
+        env = os.environ.copy()
+        env.update(fetch(names, prefix))
+        try:
+            sys.exit(subprocess.run(cmd, env=env).returncode)
+        except FileNotFoundError as e:
+            die(f"comando no encontrado: {e.filename}")
+    else:
+        die(f"modo desconocido: {mode} (usá to | run | list)")
+
+
+if __name__ == "__main__":
+    main()
