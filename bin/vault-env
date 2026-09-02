@@ -23,7 +23,22 @@ import sys
 import urllib.error
 import urllib.request
 
-VAULT = os.environ.get("VAULT_URL", "http://127.0.0.1:8100").rstrip("/")
+def _configured_url():
+    # URL persistente opcional: ~/.config/vault-env/url (una línea)
+    p = os.path.expanduser("~/.config/vault-env/url")
+    try:
+        with open(p, encoding="utf-8") as f:
+            u = f.read().strip()
+            return u.rstrip("/") if u else None
+    except OSError:
+        return None
+
+
+VAULT = (
+    os.environ.get("VAULT_URL")
+    or _configured_url()
+    or "http://127.0.0.1:8100"
+).rstrip("/")
 PLAIN = re.compile(r"^[A-Za-z0-9_@%+=:,./~-]+$")
 
 
