@@ -1,8 +1,8 @@
 # Secret Vault
 
-Secret Vault lets an agent use a credential without receiving the credential. The server keeps the value encrypted, injects it only at the point of use, and redacts it before returning command output or an upstream response.
+Secret Vault es una consola central para guardar una vez las credenciales que usan tus proyectos y agentes. Después, `vault-env` las entrega directamente al `.env` o al proceso que las necesita, sin que tengas que volver a copiarlas en cada conversación. Para llamadas opacas, el servidor también puede usar una credencial sin entregarle el valor al agente.
 
-The default surface is local LAN/tailnet on port `8100`. This is a self-hosted trust-boundary tool, not a public secret manager.
+El servidor escucha por defecto en la LAN o tailnet, en el puerto `8100`. Es una herramienta self-hosted con el host como frontera de confianza, no un gestor de secretos público.
 
 ## Demo
 
@@ -19,9 +19,9 @@ El recorrido muestra el caso principal: guardar `GITHUB_TOKEN`, descubrir solo s
 ## Camino rápido
 
 1. Define una master key fuera del repositorio.
-2. Inicia el servidor.
-3. Guarda un secreto desde la UI o con `POST /api/secrets`.
-4. Para agentes, usa `vault-env` o `/api/use/:name`; no pidas `/api/env.*` dentro del contexto del modelo.
+2. Inicia el servidor una vez, en tu máquina o en un host de tu tailnet.
+3. Guarda cada secreto desde la consola web.
+4. Desde cualquier proyecto, usa `vault-env` para seleccionar las claves que necesita.
 
 ```bash
 export SECRET_VAULT_MASTER='cargada-por-tu-runtime'
@@ -30,6 +30,24 @@ open http://localhost:8100
 ```
 
 La UI permite revelar valores solo con la master key. Esa vista es para el dueño de la consola y no forma parte del flujo del agente.
+
+## Una consola para todos tus proyectos
+
+El vault evita que cada proyecto tenga su propia copia manual de las credenciales. Guardás `GITHUB_TOKEN`, `OPENAI_API_KEY` o `COMPASS_API_KEY` una vez en la consola central, y después cada proyecto pide solo las claves que necesita.
+
+```text
+                 una sola vez                  en cada proyecto
+              ┌─────────────────┐            ┌──────────────────────┐
+              │ Secret Vault     │            │ proyecto-a           │
+              │ consola central  │ ─────────▶ │ .env / proceso       │
+              │ secretos cifrados│            └──────────────────────┘
+              └─────────────────┘            ┌──────────────────────┐
+                                             │ proyecto-b           │
+                                             │ .env / proceso       │
+                                             └──────────────────────┘
+```
+
+El agente arma el comando, pero no necesita conocer ni volver a recibir los valores. La salida de `vault-env` muestra solo las claves y los conteos.
 
 ## Por qué existe
 
@@ -58,21 +76,47 @@ curl -s http://localhost:8100/api/use/GITHUB_TOKEN \
 
 El servidor agrega el header, hace la petición y redacta el secreto si la respuesta externa lo refleja. Para `exec`, el secreto se inyecta como variable de entorno del proceso hijo y también se redactan `stdout` y `stderr`.
 
-## vault-env CLI
+## `vault-env`: llevar secretos a un proyecto sin copiarlos
 
 ```bash
 vault-env to /path/project/.env --names GH_TOKEN,NAN_API_KEY
 # ✓ 2 secretos → /path/project/.env (2 claves totales, permisos 600)
 
-vault-env to .env --append --prefix COMPASS_   # merge by key
-vault-env run --names GH_TOKEN -- git push ...  # inject into a process, exit code inherited
-vault-env list                                  # names only
+vault-env to .env --append --prefix COMPASS_    # agrega las claves COMPASS_ sin reemplazar las demás
+vault-env run --names GH_TOKEN -- git push ...  # inyecta solo durante este proceso
+vault-env list                                  # nombres disponibles, sin valores
+```
+
+El flujo habitual para un proyecto nuevo es:
+
+```bash
+cd /path/project
+vault-env to .env --names OPENAI_API_KEY,GITHUB_TOKEN
+chmod 600 .env
+```
+
+Para no crear un archivo local, ejecuta el comando con las variables inyectadas solo durante su vida:
+
+```bash
+vault-env run --names OPENAI_API_KEY -- npm run dev
 ```
 
 - Los valores no aparecen en stdout: el CLI imprime nombres y conteos.
 - La escritura es atómica (`tmp` + `rename`) y el archivo queda con permisos `600`.
 - Hay que elegir explícitamente `--names`, `--prefix` o `--all`.
 - `VAULT_URL` reemplaza el endpoint por defecto `http://127.0.0.1:8100`.
+- `vault-env run` no redirige ni redacta el output del proceso hijo: la aplicación ejecutada no debe imprimir sus variables de entorno.
+
+## Qué recibe un agente y qué recibe un proyecto
+
+| Consumidor | Puede descubrir nombres | Puede usar el secreto | Recibe el valor plano |
+|---|---:|---:|---:|
+| Agente vía `GET /api/secrets` | Sí | Sí, vía `/api/use` | No |
+| Proyecto vía `vault-env to` | Sí | Sí, desde su `.env` | El proceso destino sí |
+| Proyecto vía `vault-env run` | Sí | Sí, durante el proceso | El proceso destino sí |
+| Dueño en la consola web | Sí | Sí | Sí, con master key |
+
+La separación es intencional: el proyecto necesita la credencial para funcionar; el agente solo necesita poder pedir que se use o preparar el entorno sin que el valor vuelva al chat.
 
 ## Excepción: inyección directa
 
