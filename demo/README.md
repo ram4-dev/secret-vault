@@ -1,6 +1,6 @@
 # Video de demo
 
-El video `outputs/secret-vault-demo.mp4` es una explicación visual de 9 segundos, 1280×720, 30 fps y sin credenciales reales. `outputs/secret-vault-demo.gif` es su preview animado para visores de README que no reproducen MP4 inline.
+El video `outputs/secret-vault-demo.mp4` es una explicación visual de 9 segundos, 1280×720, 30 fps y sin credenciales reales. La escena del terminal escribe carácter por carácter `vault-env to .env --names ...` y después muestra el resultado sin valores. `outputs/secret-vault-demo.gif` es su preview animado para visores de README que no reproducen MP4 inline.
 
 ## Render
 
