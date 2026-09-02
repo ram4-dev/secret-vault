@@ -1,0 +1,15 @@
+{
+  "name": "secret-vault-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "render": "remotion render src/index.jsx SecretVaultDemo outputs/secret-vault-demo.mp4",
+    "still": "remotion still src/index.jsx SecretVaultDemo outputs/secret-vault-demo.png --frame=120"
+  },
+  "dependencies": {
+    "@remotion/cli": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "remotion": "latest"
+  }
+}
