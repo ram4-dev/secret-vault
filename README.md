@@ -6,7 +6,7 @@ The default surface is local LAN/tailnet on port `8100`. This is a self-hosted t
 
 ## Demo
 
-<video controls width="100%" src="demo/outputs/secret-vault-demo.mp4">
+<video controls muted playsinline width="100%" src="https://github.com/ram4-dev/secret-vault/raw/refs/heads/main/demo/outputs/secret-vault-demo.mp4">
   Tu visor no puede reproducir el video inline. [Abrir el MP4 directamente](demo/outputs/secret-vault-demo.mp4).
 </video>
 
