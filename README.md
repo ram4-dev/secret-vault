@@ -77,3 +77,13 @@ tests/run.js       test runner
 ```bash
 npm test
 ```
+
+## Multi-machine (Mac, other agents)
+
+`vault-env` finds the vault URL in this order: `VAULT_URL` env → `~/.config/vault-env/url` (one line) → `http://127.0.0.1:8100`.
+
+On a remote machine (e.g. the MacBook):
+
+```bash
+scp bin/vault-env mac:/tmp/ && ssh mac 'mkdir -p ~/.local/bin ~/.config/vault-env   && mv /tmp/vault-env ~/.local/bin/vault-env && chmod +x ~/.local/bin/vault-env   && echo "http://100.94.34.87:8100" > ~/.config/vault-env/url'
+```
